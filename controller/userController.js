@@ -1,4 +1,4 @@
-const { createUser, findUserByEmail, updatePassword } = require("../models/userModel");
+const { createUser, findUserByEmail, updateUserPassword } = require("../models/userModel");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const nodemailer = require("nodemailer");
@@ -111,7 +111,7 @@ const resetpassword = async (req, res) => {
     const hashedPassword = await bcrypt.hash(newPassword, 10);
 
     // Update the password in the database
-    await updatePassword(decoded.email, hashedPassword);
+    await updateUserPassword(decoded.email, hashedPassword);
 
     // Send success response
     res.json({ message: "Password updated successfully" });

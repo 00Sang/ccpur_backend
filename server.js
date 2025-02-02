@@ -17,6 +17,7 @@ app.use(express.urlencoded({ extended: true }));
 //Route Middleware
 app.use("/api/user", router);
 
+
 // Handle unknown routes
 app.all("*", (req, res) => {
   res.status(404).json({ error: "Route not found" });
