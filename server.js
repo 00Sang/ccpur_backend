@@ -1,22 +1,20 @@
-const express = require('express');
-const cors = require('cors');
-const dotenv = require("dotenv");
-const router = require('./router/route');
+const express = require("express");
+const cors = require("cors");
+const router = require("./router/route"); // 
+require('dotenv').config();
 
 const app = express();
 
-// Initialize dotenv to access environment variable
-const port = process.env.PORT;
-dotenv.config();
+// Initialize dotenv to access environment variables
+const port = process.env.PORT // 
 
-//Middleware
+// Middleware
 app.use(cors());
-app.use(express.json());// req.body
+app.use(express.json()); // Allows req.body
 app.use(express.urlencoded({ extended: true }));
 
-//Route Middleware
+// Route Middleware
 app.use("/api/user", router);
-
 
 // Handle unknown routes
 app.all("*", (req, res) => {
@@ -29,6 +27,7 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: "Internal Server Error" });
 });
 
-app.listen(port, () =>{
+// Start Server
+app.listen(port, () => {
   console.log(`Server is running on port ${port}`);
 });

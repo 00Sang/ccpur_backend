@@ -7,13 +7,14 @@ const findUserByEmail = async (email) => {
 };
 
 // Insert new user into the database
-const createUser = async (name, email, hashedPassword) => {
-  const query =
-    "INSERT INTO users (name, email, password) VALUES($1, $2, $3) RETURNING *";
-  const values = [name, email, hashedPassword];
+const createUser = async (name, email, hashedPassword, role = "student", program = null) => {
+  const query = "INSERT INTO users (name, email, password, role, program) VALUES($1, $2, $3, $4, $5) RETURNING id";
+  const values = [name, email, hashedPassword, role, program];
   const result = await pool.query(query, values);
   return result.rows[0];
 };
+
+
 
 // Update user's password
 const updateUserPassword = async (email, hashedPassword) => {
@@ -26,3 +27,5 @@ module.exports = {
   createUser,
   updateUserPassword,
 };
+
+
