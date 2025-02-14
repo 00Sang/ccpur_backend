@@ -1,4 +1,3 @@
-const studentData = require("../models/newApplicationModel");
 const { createStudent } = require("../models/newApplicationModel");
 const multer = require("multer");
 const path = require("path");

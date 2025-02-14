@@ -1,20 +1,40 @@
 const express = require("express");
 const cors = require("cors");
-const router = require("./router/route"); // 
-require('dotenv').config();
+const router = require("./router/route");
+const helmet = require("helmet");
+//const rateLimit = require("express-rate-limit");
+require("dotenv").config();
 
 const app = express();
 
-// Initialize dotenv to access environment variables
-const port = process.env.PORT // 
+// Set PORT with fallback
+const port = process.env.PORT || 3000;
 
-// Middleware
+// Security middleware
+app.use(helmet());
 app.use(cors());
-app.use(express.json()); // Allows req.body
+// Body parsers (important before route handling)
+app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Route Middleware
-app.use("/api/user", router);
+// Rate limiter (applies to all /api/ routes)
+/*const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // Limit each IP to 100 requests per window
+  message: "Too many requests, please try again later.",
+});
+app.use("/api/", limiter); // Apply rate limiting
+
+// CORS Configuration
+const corsOptions = {
+  origin: process.env.FRONTEND_URL || "http://localhost:3000",
+  methods: ["GET", "POST", "PUT", "DELETE"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+};
+app.use(cors(corsOptions));*/
+
+// Routes
+app.use("/api", router);
 
 // Handle unknown routes
 app.all("*", (req, res) => {

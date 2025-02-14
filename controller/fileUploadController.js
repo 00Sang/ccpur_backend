@@ -1,105 +1,114 @@
 const fs = require("fs");
 const path = require("path");
-const pool = require("../db");
+const pool = require("../config/db");
 
-// Upload file controller
 const uploadFile = async (req, res) => {
   try {
-    const { aadhaar_no } = req.body; // Extract Aadhaar number from request body
-    if (!req.files || !req.files.passport || !req.files.signature) {
-      return res.status(400).json({ error: "Both passport and signature files are required" });
+    const { user_id, applicant_id } = req.body;
+
+    if (!user_id || !applicant_id) {
+      return res.status(400).json({ error: "Both user ID and applicant ID are required." });
     }
 
-    // Get the passport and signature files
+    if (!req.files || !req.files.passport || !req.files.signature) {
+      return res.status(400).json({ error: "Both passport and signature files are required." });
+    }
+
     const passportFile = req.files.passport[0];
     const signatureFile = req.files.signature[0];
 
-    // Define file paths to store on the server
     const passportPath = `/uploads/${passportFile.filename}`;
     const signaturePath = `/uploads/${signatureFile.filename}`;
 
-    // Store file metadata in the database
-    const result = await pool.query(
-      "INSERT INTO file_uploads (aadhaar_no, passport_path, signature_path) VALUES ($1, $2, $3) RETURNING *",
-      [aadhaar_no, passportPath, signaturePath]
+    await pool.query(
+      `INSERT INTO file_uploads (user_id, applicant_id, passport_path, signature_path) 
+       VALUES ($1, $2, $3, $4)`,
+      [
+        user_id,
+        applicant_id,
+        passportPath,
+        signaturePath,
+      ]
     );
+    
 
-    res.status(201).json({ success: "Files uploaded successfully", files: result.rows[0] });
+    res.status(201).json({ success: "Files uploaded successfully", user_id, applicant_id });
   } catch (err) {
     console.error("Error uploading file:", err);
     res.status(500).json({ error: "File upload failed" });
   }
 };
 
-// Get files metadata by Aadhaar number (returns file info, not actual files)
-const getFilesByAadhaar = async (req, res) => {
+
+// Get files metadata by user ID (returns file info, not actual files)
+const getFilesByUserId = async (req, res) => {
+  console.log("User from Token:", req.user);  // Debug line
   try {
-    const { aadhaar_no } = req.params;
+    const { user_id } = req.params;
     const result = await pool.query(
-      "SELECT * FROM file_uploads WHERE aadhaar_no = $1",
-      [aadhaar_no]
+      "SELECT * FROM file_uploads WHERE user_id = $1",
+      [user_id]
     );
 
     if (result.rows.length === 0) {
       return res.status(404).json({ success: false, error: "No files found" });
     }
 
-    res.json({ success: "successfully retreived file", files: result.rows });
+    res.json({ success: "Successfully retrieved files", files: result.rows });
   } catch (err) {
     console.error("Error fetching uploads:", err);
     res.status(500).json({ success: false, error: "Internal Server Error" });
   }
 };
 
-// Secure file retrieval based on Aadhaar number and user role
-const getSecureFile = async (req, res) => {
+// Retrieve both passport and signature files for a given user
+const getSecureFiles = async (req, res) => {
   try {
-    const { aadhaar_no, filename } = req.params;
-    const userId = req.user.id; // Retrieved from authentication middleware
-    const userRole = req.user.role; // User's role from token
+    const { user_id } = req.params;
+    const requestingUserId = req.user.id;
+    const userRole = req.user.role;
 
-    // Check if the user exists and fetch their Aadhaar number (if student)
-    const userResult = await pool.query("SELECT role FROM users WHERE id = $1", [userId]);
-
-    if (userResult.rows.length === 0) {
-      return res.status(403).json({ error: "Unauthorized access" });
+    // Validate user access
+    if (userRole !== "admin" && userRole !== "staff" && requestingUserId !== user_id) {
+      return res.status(403).json({ error: "Access denied: You can only access your own files" });
     }
 
-    // If the user is not an admin, ensure they are only accessing their own files
-    if (userRole !== "admin") {
-      const studentResult = await pool.query(
-        "SELECT aadhaar_no FROM student_details WHERE user_id = $1",
-        [userId]
-      );
-
-      if (studentResult.rows.length === 0 || studentResult.rows[0].aadhaar_no !== aadhaar_no) {
-        return res.status(403).json({ error: "Access denied: You can only access your own files" });
-      }
-    }
-
-    // Check if the requested file exists in the database
-    const fileResult = await pool.query(
-      "SELECT file_name FROM file_uploads WHERE aadhaar_no = $1 AND file_name = $2",
-      [aadhaar_no, filename]
-    );
+    // Fetch both passport and signature paths from the database
+    const query = `SELECT passport_path, signature_path FROM file_uploads WHERE user_id = $1`;
+    const fileResult = await pool.query(query, [user_id]);
 
     if (fileResult.rows.length === 0) {
-      return res.status(404).json({ error: "File not found" });
+      return res.status(404).json({ error: "Files not found for the given user" });
     }
 
-    // Construct file path
-    const filePath = path.join(__dirname, "..", "uploads", filename);
+    const { passport_path, signature_path } = fileResult.rows[0];
 
-    // Check if file exists on the server
-    if (!fs.existsSync(filePath)) {
-      return res.status(404).json({ error: "File does not exist" });
+    // Construct file paths
+    const passportFilePath = passport_path ? path.join(__dirname, "..", passport_path) : null;
+    const signatureFilePath = signature_path ? path.join(__dirname, "..", signature_path) : null;
+
+    // Check file existence
+    const passportExists = passportFilePath && fs.existsSync(passportFilePath);
+    const signatureExists = signatureFilePath && fs.existsSync(signatureFilePath);
+
+    // Prepare response
+    const files = {};
+    if (passportExists) files.passport_url = `/uploads/${path.basename(passport_path)}`;
+    if (signatureExists) files.signature_url = `/uploads/${path.basename(signature_path)}`;
+
+    if (!passportExists && !signatureExists) {
+      return res.status(404).json({ error: "Files do not exist on the server" });
     }
 
-    // Serve the file securely
-    res.sendFile(filePath);
+    res.status(200).json({
+      message: "Successfully retrieved files",
+      files,
+    });
   } catch (error) {
-    console.error("Error fetching file:", error);
+    console.error("Error fetching files:", error);
     res.status(500).json({ error: "Internal Server Error" });
   }
 };
-module.exports = { uploadFile, getFilesByAadhaar, getSecureFile };
+
+module.exports = { uploadFile, getFilesByUserId, getSecureFiles };
+

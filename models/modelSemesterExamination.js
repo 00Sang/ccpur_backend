@@ -1,4 +1,5 @@
-const pool = require("../db");
+const pool = require("../config/db");
+
 
 const studentExamination = async (studentexam) => {
   try {
@@ -24,9 +25,7 @@ const studentExamination = async (studentexam) => {
         division3, subject_taken3, exampassed4, board4, year4, roll_no4, division4, subject_taken4, 
         debarred_exam_name, debarred_year, debarred_rollno, debarred_board
       ) VALUES (
-        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20,
-        $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36, $37, $38, $39, $40,
-        $41, $42, $43, $44, $45, $46, $47, $48, $49, $50, $51, $52, $53, $54, $55, $56, $57, $58, $59, $60
+        ${Array.from({ length: 62 }, (_, i) => `$${i + 1}`).join(", ")}
       ) RETURNING *;
     `;
 
@@ -41,11 +40,20 @@ const studentExamination = async (studentexam) => {
       debarred_exam_name, debarred_year, debarred_rollno, debarred_board
     ];
 
-    const result = await pool.query(query, values);
-    return result.rows[0]; // Return the inserted data
+    // Convert undefined values to NULL
+    const safeValues = values.map(val => val === undefined ? null : val);
+
+    console.log("QUERY:", query);
+    console.log("Number of Columns:", query.match(/\w+/g).length - 2);
+    console.log("Number of Values:", safeValues.length);
+    console.log("VALUES:", safeValues);
+
+    const result = await pool.query(query, safeValues);
+    return result.rows[0];
+
   } catch (error) {
     console.error("Error inserting student data:", error);
-    throw error; // Let the controller handle errors
+    throw error;
   }
 };
 

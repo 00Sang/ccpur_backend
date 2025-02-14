@@ -1,54 +1,52 @@
-const { createUser, findUserByEmail, updateUserPassword } = require("../models/userModel");
+const { createUser, findUserByEmail, updateUserPassword } = require("../models/basicUserModel");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const nodemailer = require("nodemailer");
+const pool = require("../config/db");
 require("dotenv").config();
 
-// Register a new user
-const newuser = async (req, res) => {
-  try {
-    const { name, email, password, role, aadhaar_no, program } = req.body;
 
+// Register a new user
+const newUser = async (req, res) => {
+  try {
+    const { name, email, password, program } = req.body;
+
+    // Validate required fields
     if (!name || !email || !password || !program) {
       return res.status(400).json({ message: "Please provide all required details" });
     }
 
-    // Validate role (only allow 'student', 'staff', or 'admin')
-    const validRoles = ["student", "staff", "admin"];
-    const assignedRole = validRoles.includes(role) ? role : "student"; // Default to 'student'
-
     // Check if user already exists
-    const user = await findUserByEmail(email);
-    if (user) {
+    const userExists = await findUserByEmail(email);
+    if (userExists) {
       return res.status(400).json({ message: "User with this email already exists" });
     }
 
     // Hash the password
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
+    const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Create user in the database with the assigned role
+    // Default role assignment: All new users are students
+    const assignedRole = "student";
+
+    // Insert new user into the database
     const newUser = await createUser(name, email, hashedPassword, assignedRole, program);
-    const userId = newUser.id; // Directly return ID
-
-    // Insert student details (Only if role is 'student' and Aadhaar is provided)
-    if (assignedRole === "student" && aadhaar_no) {
-      await pool.query(
-        "INSERT INTO student_details (aadhaar_no, user_id) VALUES ($1, $2)",
-        [aadhaar_no, userId]
-      );
+    if (!newUser) {
+      return res.status(500).json({ message: "Error creating user" });
     }
+
+    // Insert student details for the new user
+    await pool.query("INSERT INTO student_details (user_id) VALUES ($1)", [newUser.id]);
 
     return res.status(201).json({
       message: "User registered successfully",
-      userId,
-      name,
-      email,
-      password,
-      role,
-      program
+      user: {
+        id: newUser.id,
+        name: newUser.name,
+        email: newUser.email,
+        role: assignedRole,
+        program: newUser.program,
+      },
     });
-
   } catch (error) {
     console.error("Error in user registration:", error);
     return res.status(500).json({ message: "Internal Server Error" });
@@ -92,7 +90,16 @@ const login = async (req, res) => {
   }
 };
 
-// Forgot password
+// Configure the transporter
+const transporter = nodemailer.createTransport({
+  service: "gmail", // Change this if using another service
+  auth: {
+    user: process.env.EMAIL_USER, // Your email address
+    pass: process.env.EMAIL_PASS, // App password (not your regular password)
+  },
+});
+
+// Forgot password function
 const forgotpassword = async (req, res) => {
   try {
     const { email } = req.body;
@@ -113,10 +120,12 @@ const forgotpassword = async (req, res) => {
     // Send email with reset link
     const resetLink = `${process.env.FRONTEND_URL}/resetpassword/${resetToken}`;
     
+    // Send email using Nodemailer
     await transporter.sendMail({
+      from: `"Support" <${process.env.EMAIL_USER}>`, // Sender name & email
       to: email,
       subject: "Password Reset Request",
-      html: `<p>Click <a href="${resetLink}">here</a> to reset your password.</p>`
+      html: `<p>Click <a href="${resetLink}">here</a> to reset your password.</p>`,
     });
 
     res.json({ message: "Password reset link sent to your email." });
@@ -152,7 +161,7 @@ const resetpassword = async (req, res) => {
 };
 
 module.exports = {
-  newuser,
+  newUser,
   login,
   resetpassword,
   forgotpassword,

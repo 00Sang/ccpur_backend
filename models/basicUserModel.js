@@ -1,6 +1,5 @@
-const pool = require("../db");
+const pool = require("../config/db");
 
-// Check if a user exists by email
 const findUserByEmail = async (email) => {
   const result = await pool.query("SELECT * FROM users WHERE email = $1", [email]);
   return result.rows[0];
@@ -8,7 +7,7 @@ const findUserByEmail = async (email) => {
 
 // Insert new user into the database
 const createUser = async (name, email, hashedPassword, role = "student", program = null) => {
-  const query = "INSERT INTO users (name, email, password, role, program) VALUES($1, $2, $3, $4, $5) RETURNING id";
+  const query = "INSERT INTO users (name, email, password, role, program) VALUES($1, $2, $3, $4, $5) RETURNING user_id";
   const values = [name, email, hashedPassword, role, program];
   const result = await pool.query(query, values);
   return result.rows[0];
