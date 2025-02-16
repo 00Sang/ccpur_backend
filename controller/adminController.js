@@ -1,4 +1,4 @@
-const { getStudents, getStaff, updateStudentById, deletingStudent} = require('../models/adminModels');
+const { getStudents, getStaff, updateStudentById, deletingStudent, getLatestAdmittedStudents} = require('../models/adminModels').default;
 
 // Get student details with pagination(Admin & Staff)
 async function getStudentsDetails(req, res) {
@@ -15,7 +15,7 @@ async function getStudentsDetails(req, res) {
 // Get staff details with pagination
 async function getStaffDetails(req, res) {
     try {
-        const { page = 1, limit = 25, ...filters } = req.query;
+        const { page = 1, limit = 5, ...filters } = req.query;
         const offset = (page - 1) * limit;
         const result = await getStaff(filters, limit, offset);
         res.json(result.rows);
@@ -109,5 +109,23 @@ const rejectApplicant = async (req, res) => {
         res.status(500).json({ success: false, message: "Error processing application" });
     }
 };
+// Get latest admitted students
 
-module.exports = { getStudentsDetails, getStaffDetails, deleteStudent, updateStudent };
+const getLatestStudents = async (req, res) => {
+    try {
+        const result = await getLatestAdmittedStudents();
+        const students = result.rows;
+
+        if (students.length === 0) {
+            return res.status(404).json({ message: 'No recently admitted students found' });
+        }
+
+        res.status(200).json(students);
+    } catch (error) {
+        console.error('Error fetching latest admitted students:', error);
+        res.status(500).json({ message: 'Internal Server Error' });
+    }
+};
+
+
+module.exports = { getStudentsDetails, getStaffDetails, deleteStudent, updateStudent, approveApplicant, rejectApplicant, getLatestStudents};

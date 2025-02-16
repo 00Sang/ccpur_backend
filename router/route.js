@@ -6,7 +6,7 @@ const { uploadFile, getFilesByUserId, getSecureFiles } = require("../controller/
 const upload = require("../middleware/uploadFileMiddleware"); 
 const paymentController = require("../controller/paymentController");
 const { getTeachingStaff, getNonTeachingStaff, updateAttendance,facultyDashboard, updateStaffDetails } = require('../controller/facultyInfoController');
-const { getStaffDetails, getStudentsDetails, deleteStudent, updateStudent } = require('../controller/adminController');
+const { getStaffDetails, getStudentsDetails, deleteStudent, updateStudent, getLatestStudents} = require('../controller/adminController');
 const { authenticateUser, authorizeRoles } = require('../middleware/basicAuth'); // Import authentication and RBAC middleware
 const { deleteStaffDetails } = require('../models/facultyInfoModels');
 const { semesterExamination } = require("../controller/studentExaminationController");
@@ -65,7 +65,7 @@ router.post("/payments/checkout", authenticateUser, paymentController.createPaym
 
 
 // Teaching & Non-Teaching Routes
-router.get('/teaching-staff', authenticateUser, authorizeRoles('admin', 'staff'), getTeachingStaff); //Protected route
+router.get('/teaching-staff',  getTeachingStaff); //Protected route
 router.get('/non-teaching-staff', authenticateUser, authorizeRoles('admin', 'staff'), getNonTeachingStaff); //Protected route
 
 // Faculty and Admin Protected Routes
@@ -98,6 +98,9 @@ router.delete('/deleteStaffDetails',authenticateUser, authorizeRoles('admin'), d
 // Application Forms(NEW & OLD)
 router.post("/newapplication",authenticateUser, upload, newapplication);
 router.post("/existingstudentform", existingstudentsform);
+
+// Route to get latest admitted students for only admin page display
+router.get('/students/latest', getLatestStudents);
 
 //Route to get all pending Applications
 router.get('/getPendingApplications',  getPendingApplications);//ptotected route
